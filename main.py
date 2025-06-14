@@ -13,6 +13,219 @@ from point_system import PointSystem
 from utils.app_categorizer import AppCategorizer
 from app_controller import AppController
 
+class SettingsDialog(tk.Toplevel):
+    def __init__(self, parent, app_categorizer, point_system):
+        super().__init__(parent)
+        self.title("Settings")
+        self.geometry("600x500")
+        self.resizable(False, False)
+        
+        # Make dialog modal
+        self.transient(parent)
+        self.grab_set()
+        
+        # Store references
+        self.app_categorizer = app_categorizer
+        self.point_system = point_system
+        
+        # Create notebook for tabs
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill='both', expand=True, padx=10, pady=5)
+        
+        # Create tabs
+        self.create_app_categories_tab()
+        self.create_points_tab()
+        
+        # Add save button at bottom
+        self.save_button = ttk.Button(self, text="Save", command=self.save_settings)
+        self.save_button.pack(pady=10)
+
+    def create_app_categories_tab(self):
+        """Create the app categories tab."""
+        tab = ttk.Frame(self.notebook)
+        self.notebook.add(tab, text="App Categories")
+        
+        # Create frames for productive and entertainment apps
+        lists_frame = ttk.Frame(tab)
+        lists_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        
+        productive_frame = ttk.LabelFrame(lists_frame, text="Productive Apps", padding="5")
+        productive_frame.pack(side="left", fill="both", expand=True, padx=5)
+        
+        entertainment_frame = ttk.LabelFrame(lists_frame, text="Entertainment Apps", padding="5")
+        entertainment_frame.pack(side="right", fill="both", expand=True, padx=5)
+        
+        # Create listboxes with scrollbars
+        # Productive apps
+        productive_scroll = ttk.Scrollbar(productive_frame)
+        productive_scroll.pack(side="right", fill="y")
+        
+        self.productive_list = tk.Listbox(productive_frame, yscrollcommand=productive_scroll.set)
+        self.productive_list.pack(side="left", fill="both", expand=True)
+        productive_scroll.config(command=self.productive_list.yview)
+        
+        # Add remove button for productive apps
+        ttk.Button(
+            productive_frame,
+            text="Remove Selected",
+            command=lambda: self.remove_app(self.productive_list, self.productive_list.curselection()[0] if self.productive_list.curselection() else -1)
+        ).pack(side="bottom", fill="x", pady=5)
+        
+        # Entertainment apps
+        entertainment_scroll = ttk.Scrollbar(entertainment_frame)
+        entertainment_scroll.pack(side="right", fill="y")
+        
+        self.entertainment_list = tk.Listbox(entertainment_frame, yscrollcommand=entertainment_scroll.set)
+        self.entertainment_list.pack(side="left", fill="both", expand=True)
+        entertainment_scroll.config(command=self.entertainment_list.yview)
+        
+        # Add remove button for entertainment apps
+        ttk.Button(
+            entertainment_frame,
+            text="Remove Selected",
+            command=lambda: self.remove_app(self.entertainment_list, self.entertainment_list.curselection()[0] if self.entertainment_list.curselection() else -1)
+        ).pack(side="bottom", fill="x", pady=5)
+        
+        # Add input frame at the bottom
+        input_frame = ttk.LabelFrame(tab, text="Add New App", padding="5")
+        input_frame.pack(side="bottom", fill="x", padx=5, pady=5)
+        
+        # New app entry
+        ttk.Label(input_frame, text="App Name:").pack(side="left", padx=(0, 5))
+        self.new_app_entry = ttk.Entry(input_frame)
+        self.new_app_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        
+        # Category dropdown
+        ttk.Label(input_frame, text="Category:").pack(side="left", padx=(0, 5))
+        self.category_var = tk.StringVar(value="productive")
+        category_dropdown = ttk.Combobox(
+            input_frame, 
+            textvariable=self.category_var,
+            values=["productive", "entertainment"],
+            state="readonly",
+            width=15
+        )
+        category_dropdown.pack(side="left", padx=(0, 5))
+        
+        # Add button
+        ttk.Button(
+            input_frame,
+            text="Add",
+            command=self.add_new_app
+        ).pack(side="left")
+        
+        # Load current categories
+        self.load_categories()
+
+    def load_categories(self):
+        """Load current app categories into the listboxes."""
+        # Clear existing items
+        self.productive_list.delete(0, tk.END)
+        self.entertainment_list.delete(0, tk.END)
+        
+        # Load productive apps
+        for app in self.app_categorizer.get_productive_apps():
+            self.productive_list.insert(tk.END, app)
+        
+        # Load entertainment apps
+        for app in self.app_categorizer.get_entertainment_apps():
+            self.entertainment_list.insert(tk.END, app)
+
+    def add_new_app(self):
+        """Add a new app to the selected category."""
+        app = self.new_app_entry.get().strip()
+        if app:
+            category = self.category_var.get()
+            if category == "productive":
+                self.productive_list.insert(tk.END, app)
+            else:
+                self.entertainment_list.insert(tk.END, app)
+            self.new_app_entry.delete(0, tk.END)
+
+    def remove_app(self, listbox, index):
+        """Remove an app from the specified listbox."""
+        if index >= 0:
+            listbox.delete(index)
+
+    def create_points_tab(self):
+        """Create tab for configuring point values."""
+        points_frame = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(points_frame, text="Points")
+        
+        # Create main content frame
+        content_frame = ttk.Frame(points_frame)
+        content_frame.pack(fill='both', expand=True)
+        
+        # Get current config
+        config = self.point_system.get_config()
+        
+        # Productive points
+        ttk.Label(content_frame, text="Points per minute for productive apps:").pack(anchor='w', pady=(0, 5))
+        self.productive_points = ttk.Spinbox(
+            content_frame,
+            from_=1,
+            to=100,
+            width=10,
+            validate='key',
+            validatecommand=(self.register(self.validate_number), '%P')
+        )
+        self.productive_points.set(config["productive_points_per_minute"])
+        self.productive_points.pack(anchor='w', pady=(0, 20))
+        
+        # Entertainment points
+        ttk.Label(content_frame, text="Points deducted per minute for entertainment apps:").pack(anchor='w', pady=(0, 5))
+        self.entertainment_points = ttk.Spinbox(
+            content_frame,
+            from_=1,
+            to=100,
+            width=10,
+            validate='key',
+            validatecommand=(self.register(self.validate_number), '%P')
+        )
+        self.entertainment_points.set(config["entertainment_points_per_minute"])
+        self.entertainment_points.pack(anchor='w')
+        
+        # Add explanation text
+        explanation = (
+            "Points are awarded or deducted based on time spent in each category.\n"
+            "For example, if you set 2 points per minute for productive apps,\n"
+            "you'll earn 2 points for each minute spent on productive apps.\n"
+            "Similarly, if you set 1 point per minute for entertainment apps,\n"
+            "you'll lose 1 point for each minute spent on entertainment apps."
+        )
+        ttk.Label(
+            content_frame,
+            text=explanation,
+            wraplength=500,
+            justify='left'
+        ).pack(anchor='w', pady=(20, 0))
+
+    def validate_number(self, value):
+        """Validate that input is a positive number."""
+        if value == "":
+            return True
+        try:
+            num = int(value)
+            return num > 0
+        except ValueError:
+            return False
+
+    def save_settings(self):
+        """Save all settings."""
+        # Save app categories
+        self.app_categorizer.save_categories()
+        
+        # Save point values
+        try:
+            productive_points = int(self.productive_points.get())
+            entertainment_points = int(self.entertainment_points.get())
+            self.point_system.update_config(productive_points, entertainment_points)
+        except ValueError:
+            messagebox.showerror("Error", "Please enter valid numbers for point values")
+            return
+        
+        self.destroy()
+
 class GetBack2Work:
     def __init__(self):
         # Create data directory if it doesn't exist
@@ -106,23 +319,25 @@ class GetBack2Work:
         # CURRENT ACTIVITY SECTION
         activity_frame = ttk.LabelFrame(main_frame, text="📊 CURRENT ACTIVITY", padding="5")
         activity_frame.grid(row=2, column=0, columnspan=2, pady=10, sticky=(tk.W, tk.E, tk.N, tk.S))
+        activity_frame.grid_rowconfigure(0, weight=1)
+        activity_frame.grid_columnconfigure(0, weight=1)
 
         # Create a canvas with scrollbar for the apps list
-        canvas = tk.Canvas(activity_frame)
-        scrollbar = ttk.Scrollbar(activity_frame, orient="vertical", command=canvas.yview)
-        self.apps_frame = ttk.Frame(canvas)
+        self.canvas = tk.Canvas(activity_frame)
+        self.scrollbar = ttk.Scrollbar(activity_frame, orient="vertical", command=self.canvas.yview)
+        self.apps_frame = ttk.Frame(self.canvas)
 
         # Configure canvas
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
+        self.canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        self.scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
 
         # Create window in canvas
-        canvas_frame = canvas.create_window((0, 0), window=self.apps_frame, anchor="nw")
-        
+        self.canvas_frame = self.canvas.create_window((0, 0), window=self.apps_frame, anchor="nw")
+
         # Bind events for scrolling
-        self.apps_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_frame, width=e.width))
+        self.apps_frame.bind("<Configure>", self._on_frame_configure)
+        self.canvas.bind("<Configure>", self._on_canvas_configure)
 
         # Dictionary to store app labels
         self.app_labels = {}
@@ -157,6 +372,14 @@ class GetBack2Work:
         buttons_frame.grid_columnconfigure(1, weight=1)
         buttons_frame.grid_columnconfigure(2, weight=1)
 
+    def _on_frame_configure(self, event=None):
+        """Reset the scroll region to encompass the inner frame"""
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
+    def _on_canvas_configure(self, event):
+        """Reset the width of the inner frame to match the canvas"""
+        self.canvas.itemconfig(self.canvas_frame, width=event.width)
+
     def show_buy_time(self):
         """Show the buy time dialog."""
         # TODO: Implement buy time dialog
@@ -164,8 +387,7 @@ class GetBack2Work:
 
     def show_settings(self):
         """Show the settings dialog."""
-        # TODO: Implement settings dialog
-        pass
+        SettingsDialog(self.root, self.app_categorizer, self.point_system)
 
     def show_stats(self):
         """Show the stats dialog."""
@@ -184,34 +406,36 @@ class GetBack2Work:
             windows_info = self.window_monitor.get_all_windows_info()
             if windows_info:
                 # Clear old labels
-                for label in self.app_labels.values():
-                    label.destroy()
+                for widget in self.apps_frame.winfo_children():
+                    widget.destroy()
                 self.app_labels.clear()
 
                 # Create new labels for each window
-                for i, (process_name, (window_title, _, _)) in enumerate(windows_info.items()):
-                    if window_title:  # Only show windows with titles
-                        # Create a frame for each app
-                        app_frame = ttk.Frame(self.apps_frame)
-                        app_frame.pack(fill="x", padx=5, pady=2)
+                for process_name, (window_title, hwnd, process_id) in windows_info.items():
+                    # Create a frame for each app
+                    app_frame = ttk.Frame(self.apps_frame)
+                    app_frame.pack(fill="x", padx=5, pady=2)
 
-                        # App name and title
-                        app_label = ttk.Label(
-                            app_frame,
-                            text=f"{process_name} - {window_title}",
-                            font=("Arial", 10)
-                        )
-                        app_label.pack(side="left", fill="x", expand=True)
-                        self.app_labels[process_name] = app_label
+                    # App name and title
+                    app_label = ttk.Label(
+                        app_frame,
+                        text=f"{os.path.basename(process_name)} - {window_title}",
+                        font=("Arial", 10)
+                    )
+                    app_label.pack(side="left", fill="x", expand=True)
+                    self.app_labels[process_name] = app_label
 
-                        # Add block button
-                        block_btn = ttk.Button(
-                            app_frame,
-                            text="🚫",
-                            width=3,
-                            command=lambda p=process_name: self.block_app(p)
-                        )
-                        block_btn.pack(side="right", padx=5)
+                    # Add block button
+                    block_btn = ttk.Button(
+                        app_frame,
+                        text="🚫",
+                        width=3,
+                        command=lambda p=process_name: self.block_app(p)
+                    )
+                    block_btn.pack(side="right", padx=5)
+
+                # Update scroll region
+                self._on_frame_configure()
 
         except Exception as e:
             print(f"Error processing window queue: {e}")
@@ -263,6 +487,66 @@ class GetBack2Work:
                     self.app_controller.block_app(process_name, int(self.block_duration.get()))
         except Exception as e:
             print(f"Error handling window change: {e}")
+
+    def process_window_change(self, window_info):
+        """Process window change and update points."""
+        if not window_info:
+            return
+            
+        process_name = window_info.get('process_name', '').lower()
+        window_title = window_info.get('window_title', '')
+        
+        # Skip if it's our own window
+        if process_name == "python" and "GetBack2Work" in window_title:
+            return
+            
+        # Get current time
+        current_time = datetime.now()
+        
+        # If we have a previous window, calculate time spent
+        if self.last_window and self.last_window_time:
+            time_spent = (current_time - self.last_window_time).total_seconds() / 60  # Convert to minutes
+            if time_spent >= 1:  # Only update if at least 1 minute has passed
+                # Get category of the last window
+                category = self.app_categorizer.get_category(self.last_window['process_name'])
+                if category:
+                    # Update points based on time spent
+                    self.point_system.update_points(category, int(time_spent))
+                    # Update display
+                    self.update_display()
+        
+        # Update last window info
+        self.last_window = window_info
+        self.last_window_time = current_time
+        
+        # Update current activity display
+        if process_name:
+            category = self.app_categorizer.get_category(process_name)
+            if category:
+                self.current_activity_label.config(
+                    text=f"Current Activity: {process_name} ({category})"
+                )
+            else:
+                self.current_activity_label.config(
+                    text=f"Current Activity: {process_name} (uncategorized)"
+                )
+        else:
+            self.current_activity_label.config(text="Current Activity: None")
+
+    def update_display(self):
+        """Update the display with current points and streak."""
+        # Update points display
+        points = self.point_system.get_points()
+        self.points_label.config(text=f"{points:,}")
+        
+        # Update streak display
+        streak = self.point_system.get_streak()
+        hours = streak // 60
+        minutes = streak % 60
+        self.streak_label.config(text=f"{hours:02d}:{minutes:02d}")
+        
+        # Update streak progress bar
+        self.streak_progress['value'] = minutes
 
     def run(self):
         """Start the application."""

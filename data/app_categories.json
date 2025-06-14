@@ -1,0 +1,32 @@
+{
+    "productive": [
+        "java.exe",
+        "code.exe",
+        "slack.exe",
+        "notepad++.exe",
+        "excel.exe",
+        "teams.exe",
+        "vscode.exe",
+        "git.exe",
+        "sublime_text.exe",
+        "terminal.exe",
+        "python.exe",
+        "node.exe",
+        "github.exe",
+        "word.exe",
+        "powershell.exe",
+        "cmd.exe",
+        "gitkraken.exe",
+        "outlook.exe",
+        "powerpnt.exe"
+    ],
+    "entertainment": [
+        "steam.exe",
+        "teamspeak.exe",
+        "epicgameslauncher.exe",
+        "skype.exe",
+        "battle.net.exe",
+        "spotify.exe",
+        "itunes.exe"
+    ]
+}
