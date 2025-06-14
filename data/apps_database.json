@@ -1,0 +1,43 @@
+{
+  "productive": {
+    "processes": [
+      "code.exe",
+      "devenv.exe",
+      "notepad++.exe",
+      "excel.exe",
+      "winword.exe",
+      "chrome.exe",
+      "firefox.exe",
+      "msedge.exe"
+    ],
+    "keywords": [
+      "stackoverflow",
+      "github",
+      "documentation",
+      "tutorial",
+      "learn",
+      "work",
+      "study",
+      "research"
+    ]
+  },
+  "entertainment": {
+    "processes": [
+      "steam.exe",
+      "spotify.exe",
+      "discord.exe",
+      "minecraft.exe",
+      "leagueclient.exe"
+    ],
+    "keywords": [
+      "youtube",
+      "netflix",
+      "twitch",
+      "reddit",
+      "facebook",
+      "instagram",
+      "twitter",
+      "tiktok"
+    ]
+  }
+}
