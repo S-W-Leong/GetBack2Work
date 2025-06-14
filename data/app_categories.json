@@ -1,32 +1,31 @@
 {
     "productive": [
         "java.exe",
-        "code.exe",
-        "slack.exe",
-        "notepad++.exe",
-        "excel.exe",
-        "teams.exe",
-        "vscode.exe",
+        "word.exe",
         "git.exe",
-        "sublime_text.exe",
-        "terminal.exe",
+        "gitkraken.exe",
         "python.exe",
+        "notepad++.exe",
         "node.exe",
         "github.exe",
-        "word.exe",
-        "powershell.exe",
-        "cmd.exe",
-        "gitkraken.exe",
+        "powerpnt.exe",
+        "code.exe",
+        "excel.exe",
         "outlook.exe",
-        "powerpnt.exe"
+        "teams.exe",
+        "cmd.exe",
+        "slack.exe",
+        "powershell.exe",
+        "vscode.exe"
     ],
     "entertainment": [
-        "steam.exe",
+        "battle.net.exe",
         "teamspeak.exe",
+        "32bitmapibroker",
         "epicgameslauncher.exe",
         "skype.exe",
-        "battle.net.exe",
         "spotify.exe",
+        "steam.exe",
         "itunes.exe"
     ]
 }

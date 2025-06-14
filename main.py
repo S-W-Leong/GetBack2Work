@@ -14,7 +14,7 @@ from utils.app_categorizer import AppCategorizer
 from app_controller import AppController
 
 class SettingsDialog(tk.Toplevel):
-    def __init__(self, parent, app_categorizer, point_system):
+    def __init__(self, parent, app_categorizer, point_system, app_controller):
         super().__init__(parent)
         self.title("Settings")
         self.geometry("600x500")
@@ -27,6 +27,7 @@ class SettingsDialog(tk.Toplevel):
         # Store references
         self.app_categorizer = app_categorizer
         self.point_system = point_system
+        self.app_controller = app_controller
         
         # Create notebook for tabs
         self.notebook = ttk.Notebook(self)
@@ -90,10 +91,16 @@ class SettingsDialog(tk.Toplevel):
         input_frame = ttk.LabelFrame(tab, text="Add New App", padding="5")
         input_frame.pack(side="bottom", fill="x", padx=5, pady=5)
         
-        # New app entry
-        ttk.Label(input_frame, text="App Name:").pack(side="left", padx=(0, 5))
-        self.new_app_entry = ttk.Entry(input_frame)
-        self.new_app_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        # App selection dropdown
+        ttk.Label(input_frame, text="Select App:").pack(side="left", padx=(0, 5))
+        self.app_var = tk.StringVar()
+        self.app_dropdown = ttk.Combobox(
+            input_frame,
+            textvariable=self.app_var,
+            state="readonly",
+            width=30
+        )
+        self.app_dropdown.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
         # Category dropdown
         ttk.Label(input_frame, text="Category:").pack(side="left", padx=(0, 5))
@@ -114,8 +121,16 @@ class SettingsDialog(tk.Toplevel):
             command=self.add_new_app
         ).pack(side="left")
         
-        # Load current categories
+        # Load current categories and installed apps
         self.load_categories()
+        self.load_installed_apps()
+
+    def load_installed_apps(self):
+        """Load installed apps into the dropdown."""
+        installed_apps = self.app_controller.get_installed_apps()
+        self.app_dropdown['values'] = installed_apps
+        if installed_apps:
+            self.app_dropdown.set(installed_apps[0])
 
     def load_categories(self):
         """Load current app categories into the listboxes."""
@@ -133,14 +148,35 @@ class SettingsDialog(tk.Toplevel):
 
     def add_new_app(self):
         """Add a new app to the selected category."""
-        app = self.new_app_entry.get().strip()
+        app = self.app_var.get().strip()
         if app:
             category = self.category_var.get()
             if category == "productive":
+                # Check if app is already in entertainment list
+                if app in self.entertainment_list.get(0, tk.END):
+                    messagebox.showwarning(
+                        "Warning",
+                        f"{app} is already in the Entertainment list. Please remove it first."
+                    )
+                    return
                 self.productive_list.insert(tk.END, app)
             else:
+                # Check if app is already in productive list
+                if app in self.productive_list.get(0, tk.END):
+                    messagebox.showwarning(
+                        "Warning",
+                        f"{app} is already in the Productive list. Please remove it first."
+                    )
+                    return
                 self.entertainment_list.insert(tk.END, app)
-            self.new_app_entry.delete(0, tk.END)
+            
+            # Remove the app from the dropdown to prevent duplicates
+            current_values = list(self.app_dropdown['values'])
+            if app in current_values:
+                current_values.remove(app)
+                self.app_dropdown['values'] = current_values
+                if current_values:
+                    self.app_dropdown.set(current_values[0])
 
     def remove_app(self, listbox, index):
         """Remove an app from the specified listbox."""
@@ -212,8 +248,12 @@ class SettingsDialog(tk.Toplevel):
 
     def save_settings(self):
         """Save all settings."""
-        # Save app categories
-        self.app_categorizer.save_categories()
+        # Get all apps from both lists
+        productive_apps = list(self.productive_list.get(0, tk.END))
+        entertainment_apps = list(self.entertainment_list.get(0, tk.END))
+        
+        # Update the categorizer with new lists
+        self.app_categorizer.update_categories(productive_apps, entertainment_apps)
         
         # Save point values
         try:
@@ -240,6 +280,9 @@ class GetBack2Work:
         self.root.title("GetB@ck2Work!")
         self.root.geometry("480x600")
         
+        # Add protocol handler for window close
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
         # Initialize app controller after GUI
         self.app_controller = AppController(self.point_system, self.root)
         
@@ -248,20 +291,51 @@ class GetBack2Work:
         
         # Initialize activity tracking
         self.current_activity = {
-            "name": "No activity",
-            "start_time": None,
-            "points_earned": 0
+            'name': None,
+            'category': None,
+            'start_time': None,
+            'points_earned': 0
         }
         
+        # Initialize window tracking
+        self.last_window = None
+        self.last_window_time = None
+        
+        # List of protected system apps that should never be blocked
+        self.protected_apps = {
+            'taskmgr.exe',  # Task Manager
+            'explorer.exe',  # Windows Explorer
+            'python.exe',    # Python interpreter
+            'pythonw.exe',   # Python windowless
+            'cmd.exe',       # Command Prompt
+            'powershell.exe', # PowerShell
+            'systemsettings.exe', # Windows Settings
+            'ms-settings:',  # Windows Settings
+            'control.exe',   # Control Panel
+        }
+        
+        # Setup GUI
         self.setup_gui()
         
-        # Start monitoring
-        self.window_monitor.start_monitoring()
-        self.app_controller.start_monitoring()
+        # Start processing window changes
+        self.process_window_queue()
 
-        # Set up periodic updates
-        self.root.after(100, self.process_window_queue)
-        self.root.after(1000, self.update_stats)
+    def on_closing(self):
+        """Handle window closing."""
+        try:
+            # Stop all monitoring
+            self.window_monitor.stop_monitoring()
+            self.app_controller.stop_monitoring()
+            
+            # Unblock all apps
+            self.app_controller.unblock_all_apps()
+            
+            # Destroy the window
+            self.root.destroy()
+        except Exception as e:
+            print(f"Error during shutdown: {e}")
+            # Force quit if normal shutdown fails
+            self.root.quit()
 
     def setup_gui(self):
         """Set up the main GUI interface."""
@@ -387,7 +461,7 @@ class GetBack2Work:
 
     def show_settings(self):
         """Show the settings dialog."""
-        SettingsDialog(self.root, self.app_categorizer, self.point_system)
+        SettingsDialog(self.root, self.app_categorizer, self.point_system, self.app_controller)
 
     def show_stats(self):
         """Show the stats dialog."""
@@ -454,15 +528,15 @@ class GetBack2Work:
         """Update statistics display."""
         try:
             # Update points
-            self.points_label.config(
-                text=f"{self.point_system.current_points}"
-            )
+            points = self.point_system.get_points()
+            self.points_label.config(text=f"{points:,}")
 
             # Update streak
-            self.streak_label.config(
-                text=f"{self.point_system.current_streak} minutes"
-            )
-            self.streak_progress["value"] = min(self.point_system.current_streak, 100)
+            streak = self.point_system.get_streak()
+            hours = streak // 60
+            minutes = streak % 60
+            self.streak_label.config(text=f"{hours:02d}:{minutes:02d}")
+            self.streak_progress["value"] = minutes
 
             # Update time bank
             # TODO: Implement time bank progress
@@ -477,14 +551,16 @@ class GetBack2Work:
     def on_window_change(self, window_title: str, process_name: str, executable_path: str):
         """Handle window change events."""
         try:
-            category = self.app_categorizer.categorize_app(window_title, process_name)
+            # Create window info dictionary
+            window_info = {
+                'process_name': process_name,
+                'window_title': window_title,
+                'executable_path': executable_path
+            }
             
-            if category == "productive":
-                self.point_system.add_points(1, "productivity")
-                self.current_activity["points_earned"] += 1
-            elif category == "entertainment":
-                if not self.app_controller.check_app_permission(process_name, 1):
-                    self.app_controller.block_app(process_name, int(self.block_duration.get()))
+            # Process the window change
+            self.process_window_change(window_info)
+            
         except Exception as e:
             print(f"Error handling window change: {e}")
 
@@ -497,7 +573,11 @@ class GetBack2Work:
         window_title = window_info.get('window_title', '')
         
         # Skip if it's our own window
-        if process_name == "python" and "GetBack2Work" in window_title:
+        if process_name == "python" and "GetB@ck2Work" in window_title:
+            return
+            
+        # Skip if it's a protected system app
+        if process_name in self.protected_apps:
             return
             
         # Get current time
@@ -515,13 +595,30 @@ class GetBack2Work:
                     # Update display
                     self.update_display()
         
+        # Check if the new window is an entertainment app
+        category = self.app_categorizer.get_category(process_name)
+        if category == "entertainment":
+            # Calculate cost for 1 minute of entertainment
+            cost = self.point_system.points_config["entertainment_points_per_minute"]
+            current_points = self.point_system.get_points()
+            
+            if current_points < cost:
+                # Not enough points, block the app
+                self.app_controller.block_app(process_name)
+                messagebox.showwarning(
+                    "Insufficient Points",
+                    f"You need {cost} points to use {process_name}.\n"
+                    f"Current points: {current_points}\n"
+                    "Earn more points by using productive apps!"
+                )
+                return
+        
         # Update last window info
         self.last_window = window_info
         self.last_window_time = current_time
         
         # Update current activity display
         if process_name:
-            category = self.app_categorizer.get_category(process_name)
             if category:
                 self.current_activity_label.config(
                     text=f"Current Activity: {process_name} ({category})"
@@ -532,6 +629,26 @@ class GetBack2Work:
                 )
         else:
             self.current_activity_label.config(text="Current Activity: None")
+
+    def check_points_for_entertainment(self):
+        """Check if user has enough points for entertainment apps."""
+        current_points = self.point_system.get_points()
+        cost_per_minute = self.point_system.points_config["entertainment_points_per_minute"]
+        
+        # Get all running entertainment apps
+        running_apps = self.app_controller.get_running_apps()
+        for app_name, app_info in running_apps.items():
+            category = self.app_categorizer.get_category(app_name)
+            if category == "entertainment" and app_info['is_blocked'] == False:
+                if current_points < cost_per_minute:
+                    # Not enough points, block the app
+                    self.app_controller.block_app(app_name)
+                    messagebox.showwarning(
+                        "Insufficient Points",
+                        f"You need {cost_per_minute} points to use {app_name}.\n"
+                        f"Current points: {current_points}\n"
+                        "Earn more points by using productive apps!"
+                    )
 
     def update_display(self):
         """Update the display with current points and streak."""
@@ -550,6 +667,23 @@ class GetBack2Work:
 
     def run(self):
         """Start the application."""
+        # Start window monitoring
+        self.window_monitor.start_monitoring()
+        
+        # Start app controller
+        self.app_controller.start_monitoring()
+        
+        # Start points checking
+        def check_points():
+            self.check_points_for_entertainment()
+            self.root.after(1000, check_points)  # Check every second
+        
+        self.root.after(1000, check_points)
+        
+        # Start stats updates
+        self.root.after(1000, self.update_stats)
+        
+        # Start the main loop
         self.root.mainloop()
 
 if __name__ == "__main__":

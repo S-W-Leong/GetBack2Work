@@ -1,13 +1,17 @@
 import os
 import json
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple, Optional
 
 class AppCategorizer:
     def __init__(self):
         self.data_dir = "data"
         self.categories_file = os.path.join(self.data_dir, "app_categories.json")
+        
+        # Initialize categories
         self.productive_apps = set()
         self.entertainment_apps = set()
+        
+        # Load existing categories
         self.load_categories()
 
     def load_categories(self):
@@ -19,25 +23,21 @@ class AppCategorizer:
                     self.productive_apps = set(data.get('productive', []))
                     self.entertainment_apps = set(data.get('entertainment', []))
             else:
-                # Default categories
+                # Create default categories if file doesn't exist
                 self.productive_apps = {
-                    "code.exe", "vscode.exe", "notepad++.exe", "sublime_text.exe",
-                    "chrome.exe", "firefox.exe", "msedge.exe",  # Browsers for work
-                    "word.exe", "excel.exe", "powerpnt.exe", "outlook.exe",
-                    "teams.exe", "slack.exe", "discord.exe",  # Communication for work
-                    "git.exe", "github.exe", "gitkraken.exe",
-                    "cmd.exe", "powershell.exe", "terminal.exe",
-                    "python.exe", "java.exe", "node.exe"
+                    'code', 'word', 'excel', 'powerpoint', 'outlook',
+                    'notepad', 'visual studio', 'pycharm', 'vscode'
                 }
                 self.entertainment_apps = {
-                    "steam.exe", "epicgameslauncher.exe", "battle.net.exe",
-                    "discord.exe", "teamspeak.exe", "skype.exe",  # Communication for fun
-                    "spotify.exe", "vlc.exe", "itunes.exe",
-                    "chrome.exe", "firefox.exe", "msedge.exe"  # Browsers for entertainment
+                    'chrome', 'firefox', 'edge', 'spotify', 'discord',
+                    'steam', 'epic games', 'minecraft'
                 }
                 self.save_categories()
         except Exception as e:
             print(f"Error loading categories: {e}")
+            # Initialize with empty sets if loading fails
+            self.productive_apps = set()
+            self.entertainment_apps = set()
 
     def save_categories(self):
         """Save app categories to file."""
@@ -50,6 +50,40 @@ class AppCategorizer:
                 }, f, indent=4)
         except Exception as e:
             print(f"Error saving categories: {e}")
+
+    def update_categories(self, productive_apps: List[str], entertainment_apps: List[str]):
+        """Update the category lists and save to file."""
+        # Convert to lowercase for case-insensitive comparison
+        self.productive_apps = {app.lower() for app in productive_apps}
+        self.entertainment_apps = {app.lower() for app in entertainment_apps}
+        
+        # Save the updated categories
+        self.save_categories()
+
+    def get_category(self, app_name: str) -> Optional[str]:
+        """Get the category of an app."""
+        app_name = app_name.lower()
+        if app_name in self.productive_apps:
+            return "productive"
+        elif app_name in self.entertainment_apps:
+            return "entertainment"
+        return None
+
+    def get_productive_apps(self) -> List[str]:
+        """Get list of productive apps."""
+        return sorted(list(self.productive_apps))
+
+    def get_entertainment_apps(self) -> List[str]:
+        """Get list of entertainment apps."""
+        return sorted(list(self.entertainment_apps))
+
+    def is_productive(self, app_name: str) -> bool:
+        """Check if an app is productive."""
+        return app_name.lower() in self.productive_apps
+
+    def is_entertainment(self, app_name: str) -> bool:
+        """Check if an app is entertainment."""
+        return app_name.lower() in self.entertainment_apps
 
     def categorize_app(self, window_title: str, process_name: str) -> str:
         """Categorize an app as productive or entertainment."""
@@ -72,30 +106,6 @@ class AppCategorizer:
             return "entertainment"
         
         return "productive"
-
-    def get_productive_apps(self) -> List[str]:
-        """Get list of productive apps."""
-        return sorted(list(self.productive_apps))
-
-    def get_entertainment_apps(self) -> List[str]:
-        """Get list of entertainment apps."""
-        return sorted(list(self.entertainment_apps))
-
-    def update_categories(self, productive_apps: List[str], entertainment_apps: List[str]):
-        """Update the app categories."""
-        # Convert to lowercase and remove duplicates
-        productive_set = {app.lower() for app in productive_apps}
-        entertainment_set = {app.lower() for app in entertainment_apps}
-        
-        # Remove any apps that exist in both categories
-        common_apps = productive_set.intersection(entertainment_set)
-        productive_set -= common_apps
-        entertainment_set -= common_apps
-        
-        # Update the categories
-        self.productive_apps = productive_set
-        self.entertainment_apps = entertainment_set
-        self.save_categories()
 
     def add_productive_app(self, app_name: str):
         """Add an app to the productive category."""

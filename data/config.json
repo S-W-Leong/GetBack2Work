@@ -1,7 +1,6 @@
 {
-  "point_interval_seconds": 60,
-  "entertainment_cost_per_minute": 2,
-  "productivity_points_per_interval": 1,
-  "streak_bonus_multiplier": 1.5,
-  "max_streak_bonus": 3.0
+    "points": {
+        "productive_points_per_minute": 1,
+        "entertainment_points_per_minute": 1
+    }
 }
